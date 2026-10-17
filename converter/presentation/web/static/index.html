@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Высота — конвертер и распознание</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Montserrat:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="brand">
+      <div class="brand__row">
+        <span class="brand__mark" aria-hidden="true"></span>
+        <div class="brand__id">
+          <p class="brand__name">Высота</p>
+          <p class="brand__company">Строительно-монтажная компания</p>
+        </div>
+        <div class="brand__dashes" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <h1 class="brand__title">Конвертер и распознание</h1>
+      <p class="brand__lead">Загрузите PDF или WebP, скачайте JPEG, распознайте текст и отправьте его на сборку с предварительным промптом.</p>
+    </header>
+
+    <main class="panel">
+      <form id="convert-form" class="form" novalidate>
+        <label class="field field--file">
+          <span class="field__label">Файл</span>
+          <input id="file" name="file" type="file" accept=".pdf,.webp,application/pdf,image/webp" required />
+          <span id="file-name" class="field__hint">PDF или WebP до 50 МБ</span>
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="field__label">Формат</span>
+            <select id="target_format" name="target_format" required></select>
+          </label>
+          <label class="field">
+            <span class="field__label">Layout</span>
+            <select id="layout" name="layout">
+              <option value="separate">separate — по странице</option>
+              <option value="single">single — один JPEG</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="field__label">DPI</span>
+            <input id="dpi" name="dpi" type="number" min="36" max="600" value="150" required />
+            <span id="dpi-hint" class="field__hint" hidden>Для WebP не применяется: размер остаётся исходным.</span>
+          </label>
+          <label class="field">
+            <span class="field__label">Quality</span>
+            <input id="quality" name="quality" type="number" min="1" max="100" value="90" required />
+          </label>
+        </div>
+
+        <button id="submit-btn" type="submit" class="btn btn--primary">Конвертировать</button>
+      </form>
+
+      <section id="status" class="status" hidden aria-live="polite">
+        <p class="status__line">
+          <span class="status__key">Статус</span>
+          <span id="status-value" class="status__value">—</span>
+        </p>
+        <p class="status__line">
+          <span class="status__key">Job</span>
+          <span id="job-id" class="status__mono">—</span>
+        </p>
+        <p id="status-detail" class="status__detail" hidden></p>
+        <div class="actions">
+          <a id="download-btn" class="btn btn--secondary" hidden href="#">Скачать результат</a>
+          <button id="recognize-btn" type="button" class="btn btn--accent" hidden>Распознать текст</button>
+        </div>
+      </section>
+
+      <section id="ocr" class="ocr" hidden>
+        <details id="ocr-fold" class="fold">
+          <summary class="fold__summary">
+            <span class="fold__title">Распознанный текст</span>
+            <span class="fold__state"></span>
+          </summary>
+          <div class="fold__body">
+            <a id="ocr-download" class="btn btn--secondary" hidden href="#">Скачать .txt</a>
+            <textarea id="ocr-text" class="ocr__text" readonly rows="12" placeholder="Текст появится после распознавания"></textarea>
+          </div>
+        </details>
+        <details id="prompt-fold" class="fold">
+          <summary class="fold__summary">
+            <span class="fold__title">Предварительный промпт</span>
+            <span class="fold__state"></span>
+          </summary>
+          <div class="fold__body">
+            <label class="field prompt-field">
+              <span class="field__label">Вариант</span>
+              <select id="prompt-select"></select>
+            </label>
+            <textarea id="prompt-text" class="prompt__text" rows="10" placeholder="Текст промпта уйдёт в тело запроса вместе с распознанным текстом"></textarea>
+          </div>
+        </details>
+        <button id="assemble-btn" type="button" class="btn btn--accent" hidden>Отправить на сборку</button>
+        <p id="assemble-status" class="assemble-status" hidden></p>
+        <pre id="assembly-json" class="assembly-json" hidden></pre>
+        <a id="assembly-download" class="btn btn--secondary assembly-download" hidden href="#">Скачать JSON</a>
+      </section>
+
+      <p id="error" class="error" hidden role="alert"></p>
+    </main>
+  </div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
