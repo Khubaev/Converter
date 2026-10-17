@@ -37,6 +37,7 @@ class ConversionJob:
     recognition: OcrDocumentResult | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     finished_at: datetime | None = None
+    expires_at: datetime | None = None
 
     @property
     def page_count(self) -> int | None:
@@ -62,6 +63,12 @@ class ConversionJob:
     def attach_recognition(self, result: OcrDocumentResult) -> None:
         """Сохраняет OCR, чтобы его можно было отправить на сборку отдельно."""
         self.recognition = result
+
+    def release_payload(self) -> None:
+        """Сбрасывает файл, JPEG и текст OCR, когда задание удаляется по сроку."""
+        self.content = b""
+        self.bundle = None
+        self.recognition = None
 
     def mark_failed(self, message: str) -> None:
         self.status = JobStatus.FAILED

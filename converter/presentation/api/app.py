@@ -1,5 +1,8 @@
 """Фабрика FastAPI-приложения. Корень композиции для HTTP-слоя."""
 
+import asyncio
+from contextlib import asynccontextmanager, suppress
+from datetime import timedelta
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -19,7 +22,7 @@ from converter.application.submit_recognized_text import SubmitRecognizedText
 from converter.composition import build_registry
 from converter.infrastructure.in_memory_job_repository import InMemoryJobRepository
 from converter.infrastructure.n8n_text_publisher import N8nRecognizedTextPublisher
-from converter.infrastructure.settings import load_env_file
+from converter.infrastructure.settings import load_api_docs_enabled, load_env_file, load_job_ttl_seconds
 from converter.infrastructure.vk_vision_text_recognizer import VkVisionTextRecognizer
 from converter.presentation.api.dependencies import ApiContainer
 from converter.presentation.api.routes import DEFAULT_MAX_UPLOAD_BYTES, build_router
@@ -32,11 +35,12 @@ def build_api_container(registry: ConverterRegistry | None = None) -> ApiContain
     """Связывает HTTP-сценарии с реестром, jobs и OCR."""
     load_env_file()
     reg = registry or build_registry()
-    jobs = InMemoryJobRepository()
+    jobs = InMemoryJobRepository(ttl=timedelta(seconds=load_job_ttl_seconds()))
     convert_document = ConvertDocument(reg)
     get_job = GetConversionJob(jobs)
     recognizer = VkVisionTextRecognizer()
     return ApiContainer(
+        jobs=jobs,
         enqueue=EnqueueConversion(jobs, reg),
         run_job=RunConversionJob(jobs, convert_document),
         get_job=get_job,
@@ -47,12 +51,39 @@ def build_api_container(registry: ConverterRegistry | None = None) -> ApiContain
     )
 
 
+_PURGE_INTERVAL_SECONDS = 30
+
+
+async def _purge_expired_jobs(container: ApiContainer, stop: asyncio.Event) -> None:
+    """Периодически выбрасывает просроченные задания, даже если к ним никто не обращается."""
+    while True:
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=_PURGE_INTERVAL_SECONDS)
+            return
+        except TimeoutError:
+            await asyncio.to_thread(container.jobs.purge_expired)
+
+
 def create_app(
     container: ApiContainer | None = None,
     max_upload_bytes: int = DEFAULT_MAX_UPLOAD_BYTES,
 ) -> FastAPI:
     """Собирает приложение. container можно подменить в тестах."""
     api = container or build_api_container()
+    docs_enabled = load_api_docs_enabled()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        stop = asyncio.Event()
+        task = asyncio.create_task(_purge_expired_jobs(app.state.container, stop))
+        try:
+            yield
+        finally:
+            stop.set()
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
     app = FastAPI(
         title="Document Converter",
         description=(
@@ -60,6 +91,10 @@ def create_app(
             "Сейчас: pdf→jpeg, webp→jpeg, text/recognize и отправка текста на сборку."
         ),
         version="2.1.0",
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
+        lifespan=lifespan,
     )
     app.state.container = api
     app.include_router(build_router(api, max_upload_bytes=max_upload_bytes))

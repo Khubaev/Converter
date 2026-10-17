@@ -43,6 +43,25 @@ class N8nSettings:
         return self.path.startswith(("http://", "https://"))
 
 
+def load_api_docs_enabled() -> bool:
+    """True только если API_DOCS_ENABLED явно включён. На рабочем сервере docs закрыты."""
+    load_env_file()
+    return os.getenv("API_DOCS_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def load_job_ttl_seconds() -> int:
+    """Срок жизни задания в секундах. По умолчанию 5 минут."""
+    load_env_file()
+    raw = os.getenv("JOB_TTL_SECONDS", "300").strip() or "300"
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError("JOB_TTL_SECONDS должен быть целым числом секунд.") from exc
+    if value < 60:
+        raise ValueError("JOB_TTL_SECONDS не может быть меньше 60.")
+    return value
+
+
 def load_n8n_settings() -> N8nSettings:
     """Читает PATH_N8N — полный URL приёмника сборки."""
     load_env_file()

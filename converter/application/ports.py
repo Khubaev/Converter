@@ -75,6 +75,9 @@ class ConversionJobRepository(Protocol):
     def save(self, job: ConversionJob) -> None:
         """Обновляет состояние существующего задания."""
 
+    def purge_expired(self) -> int:
+        """Удаляет задания с истёкшим сроком и возвращает их число."""
+
 
 class TextRecognizer(Protocol):
     """OCR одного изображения → plain text."""

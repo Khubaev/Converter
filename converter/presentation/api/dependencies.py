@@ -6,6 +6,7 @@ from converter.application.enqueue_conversion import EnqueueConversion
 from converter.application.get_conversion_job import GetConversionJob
 from converter.application.get_conversion_result import GetConversionResult
 from converter.application.list_conversion_pairs import ListConversionPairs
+from converter.application.ports import ConversionJobRepository
 from converter.application.recognize_conversion_result import RecognizeConversionResult
 from converter.application.run_conversion_job import RunConversionJob
 from converter.application.submit_recognized_text import SubmitRecognizedText
@@ -15,6 +16,7 @@ from converter.application.submit_recognized_text import SubmitRecognizedText
 class ApiContainer:
     """Собранные сценарии для роутеров FastAPI."""
 
+    jobs: ConversionJobRepository
     enqueue: EnqueueConversion
     run_job: RunConversionJob
     get_job: GetConversionJob
