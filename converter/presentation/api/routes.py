@@ -2,6 +2,7 @@
 
 import asyncio
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
@@ -41,6 +42,20 @@ from converter.presentation.api.schemas import (
 )
 
 DEFAULT_MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+
+def _attachment_disposition(filename: str) -> str:
+    """Имя файла для скачивания. Заголовок HTTP только latin-1, кириллица идёт в filename*."""
+    cleaned = "".join(ch for ch in filename.replace('"', "") if ch not in "\r\n").strip() or "result.bin"
+    encoded = quote(cleaned, safe="")
+    try:
+        cleaned.encode("latin-1")
+        ascii_name = cleaned
+    except UnicodeEncodeError:
+        suffix = cleaned.rsplit(".", 1)[-1] if "." in cleaned else "bin"
+        suffix = "".join(ch for ch in suffix if ch.isascii() and ch.isalnum()) or "bin"
+        ascii_name = f"result.{suffix}"
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded}"
 
 
 def build_router(
@@ -168,7 +183,7 @@ def build_router(
             content=packed.body,
             media_type=packed.media_type,
             headers={
-                "Content-Disposition": f'attachment; filename="{packed.filename}"',
+                "Content-Disposition": _attachment_disposition(packed.filename),
                 "X-Page-Count": str(job.page_count or 0),
                 "X-Source-Format": job.source_format.value,
                 "X-Target-Format": job.target_format.value,

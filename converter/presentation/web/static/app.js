@@ -30,6 +30,7 @@
   const dpiHint = document.getElementById("dpi-hint");
 
   let currentJobId = null;
+  let resultObjectUrl = null;
   let ocrObjectUrl = null;
   let assemblyObjectUrl = null;
   const promptsById = new Map();
@@ -72,6 +73,29 @@
     downloadBtn.hidden = true;
     downloadBtn.removeAttribute("href");
     downloadBtn.removeAttribute("download");
+    if (resultObjectUrl) {
+      URL.revokeObjectURL(resultObjectUrl);
+      resultObjectUrl = null;
+    }
+  }
+
+  function filenameFromDisposition(disposition) {
+    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+    if (encoded) {
+      try {
+        return decodeURIComponent(encoded[1]);
+      } catch {
+        return encoded[1];
+      }
+    }
+    const plain = /filename="?([^";]+)"?/i.exec(disposition);
+    return plain ? plain[1] : "result.bin";
+  }
+
+  function showDownload() {
+    downloadBtn.hidden = false;
+    downloadBtn.href = "#";
+    downloadBtn.textContent = "Скачать результат";
   }
 
   function hideAssemblyDocument() {
@@ -218,21 +242,22 @@
     throw new Error("Превышено время ожидания конвертации");
   }
 
-  async function enableDownload(jobId) {
+  async function saveResult(jobId) {
     const response = await fetch(`${API}/${jobId}/result`);
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
       throw new Error(payload.detail || `Не удалось скачать результат (${response.status})`);
     }
     const blob = await response.blob();
-    const disposition = response.headers.get("Content-Disposition") || "";
-    const match = /filename="?([^";]+)"?/i.exec(disposition);
-    const filename = match ? match[1] : "result.bin";
-    const url = URL.createObjectURL(blob);
-    downloadBtn.hidden = false;
-    downloadBtn.href = url;
-    downloadBtn.download = filename;
-    downloadBtn.textContent = `Скачать ${filename}`;
+    const filename = filenameFromDisposition(response.headers.get("Content-Disposition") || "");
+    if (resultObjectUrl) {
+      URL.revokeObjectURL(resultObjectUrl);
+    }
+    resultObjectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = resultObjectUrl;
+    link.download = filename;
+    link.click();
   }
 
   function showOcrResult(fullText, jobId) {
@@ -316,6 +341,18 @@
 
   fileInput.addEventListener("change", syncFileHint);
 
+  downloadBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (!currentJobId) {
+      showError("Сначала выполните конвертацию");
+      return;
+    }
+    clearError();
+    saveResult(currentJobId).catch((err) => {
+      showError(err instanceof Error ? err.message : String(err));
+    });
+  });
+
   recognizeBtn.addEventListener("click", () => {
     if (!currentJobId) {
       showError("Сначала выполните конвертацию");
@@ -368,7 +405,7 @@
       currentJobId = jobId;
       showStatus(jobId, payload.status || "queued", "");
       await pollJob(jobId);
-      await enableDownload(jobId);
+      showDownload();
       recognizeBtn.hidden = false;
     } catch (err) {
       showError(err instanceof Error ? err.message : String(err));
